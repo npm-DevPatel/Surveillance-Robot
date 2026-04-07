@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Surveillance Robot Navigation System</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Light Theme Palette */
+    --bg: #f3f4f6;
+    --surface: #ffffff;
+    --surface2: #f8fafc;
+    --border: #e2e8f0;
+    --border-hover: #cbd5e1;
+    --accent: #2563eb; /* Royal Blue */
+    --accent2: #ef4444; /* Coral Red */
+    --accent3: #10b981; /* Emerald Green */
+    --accent4: #f59e0b; /* Amber */
+    --text: #1e293b;
+    --text-dim: #64748b;
+    --node-default: #ffffff;
+    --node-border: #94a3b8;
+    --wall-stroke: #cbd5e1;
+    --room-fill: #ffffff;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.5px;
+  }
+
+  .logo span { 
+    color: var(--text-dim); 
+    font-weight: 500; 
+    font-size: 0.75rem; 
+    display: block; 
+    letter-spacing: 1px; 
+    margin-top: 2px;
+  }
+
+  .status-bar {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    display: flex;
+    gap: 24px;
+    font-weight: 500;
+  }
+
+  .status-bar .live { color: var(--accent3); font-weight: 700; }
+  .status-bar .live::before { content: '● '; animation: blink 1.5s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── LAYOUT ── */
+  .app {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    height: calc(100vh - 69px);
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    box-shadow: var(--shadow-sm);
+    z-index: 10;
+  }
+
+  .sidebar-section {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-section h3 {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    letter-spacing: 1.5px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* Node selectors */
+  .node-inputs { display: flex; gap: 12px; }
+
+  .node-select-group { flex: 1; }
+
+  .node-select-group label {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  .node-select-group select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+  }
+
+  .node-select-group select:focus, 
+  .node-select-group select:hover { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
+  /* Algorithm buttons */
+  .algo-grid { display: grid; gap: 10px; }
+
+  .algo-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 14px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .algo-btn::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--color);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .algo-btn:hover { border-color: var(--border-hover); background: var(--surface2); transform: translateY(-1px); }
+  .algo-btn:hover::before { opacity: 1; }
+  .algo-btn.active { 
+    border-color: var(--color); 
+    background: color-mix(in srgb, var(--color) 4%, var(--surface)); 
+    box-shadow: 0 2px 4px color-mix(in srgb, var(--color) 10%, transparent);
+  }
+  .algo-btn.active::before { opacity: 1; }
+
+  .algo-btn .algo-tag {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--color);
+    letter-spacing: 0.5px;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .algo-btn .algo-name {
+    font-size: 1rem;
+    font-weight: 600;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .algo-btn .algo-desc {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  .algo-btn[data-algo="bfs"] { --color: var(--accent); }
+  .algo-btn[data-algo="dfs"] { --color: #8b5cf6; } /* Purple for DFS */
+  .algo-btn[data-algo="ucs"] { --color: var(--accent3); }
+  .algo-btn[data-algo="astar"] { --color: var(--accent4); }
+
+  /* Run button */
+  .run-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent);
+    border: none;
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+  }
+
+  .run-btn:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 6px 8px rgba(37, 99, 235, 0.3); }
+  .run-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .run-btn.stopping { background: var(--surface); color: var(--accent2); border: 1px solid var(--accent2); box-shadow: none; }
+  .run-btn.stopping:hover { background: #fef2f2; }
+
+  /* Speed control */
+  .speed-row { display: flex; align-items: center; gap: 12px; }
+  .speed-row label { font-size: 0.75rem; font-weight: 600; color: var(--text-dim); }
+  input[type=range] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+
+  /* Results panel */
+  .results-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    min-height: 90px;
+  }
+
+  .results-box .r-line { margin-bottom: 8px; }
+  .results-box .r-label { color: var(--text-dim); font-weight: 600; }
+  .results-box .r-value { color: var(--text); font-weight: 500; }
+  .results-box .r-path { color: var(--accent); font-weight: 700; word-break: break-all; }
+  .results-box .r-cost { color: var(--accent3); font-weight: 700; }
+  .results-box .r-empty { color: var(--text-dim); font-style: italic; font-family: 'Inter', sans-serif;}
+
+  /* Algo explanation */
+  .explanation {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .explanation summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .explanation summary::after { content: '▼'; margin-left: auto; font-size: 0.7rem; color: var(--text-dim); }
+  .explanation[open] summary::after { content: '▲'; }
+
+  .explanation .exp-body {
+    padding: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--text-dim);
+    background: var(--surface);
+  }
+
+  .explanation .exp-body strong { color: var(--text); font-weight: 600; }
+
+  /* Log panel */
+  .log-panel {
+    background: #1e293b; /* Keeping log slightly dark for terminal feel, but soft */
+    border-radius: 8px;
+    padding: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    height: 150px;
+    overflow-y: auto;
+    color: #e2e8f0;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .log-panel .log-line { margin-bottom: 4px; color: #94a3b8; }
+  .log-panel .log-line.highlight { color: #38bdf8; font-weight: 600;}
+  .log-panel .log-line.path { color: #34d399; font-weight: 600;}
+  .log-panel .log-line.warn { color: #fbbf24; }
+
+  /* ── MAP CANVAS AREA ── */
+  .map-area {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* Soft dot grid background */
+  .map-area::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(var(--border) 1px, transparent 1px);
+    background-size: 20px 20px;
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .map-container {
+    position: relative;
+    width: 700px;
+    height: 560px;
+    background: var(--surface);
+    border-radius: 12px;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border);
+  }
+
+  #map-svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ── SVG ELEMENTS ── */
+  .room-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    fill: var(--text-dim);
+    font-weight: 700;
+  }
+
+  .edge {
+    stroke: var(--border-hover);
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke 0.3s, stroke-width 0.3s;
+  }
+
+  .edge.active { stroke: var(--accent); stroke-width: 4; }
+  .edge.explored { stroke: #94a3b8; stroke-width: 3.5; }
+  .edge.path-edge { stroke: var(--accent3); stroke-width: 5; }
+  .edge.dfs-explored { stroke: #c4b5fd; stroke-width: 3.5; }
+  .edge.ucs-active { stroke: var(--accent3); stroke-width: 4; }
+  .edge.astar-active { stroke: var(--accent4); stroke-width: 4; }
+
+  /* Animated dashes for active traversal */
+  .edge.traversing {
+    stroke-dasharray: 8 6;
+    animation: dash-flow 0.6s linear infinite;
+  }
+  @keyframes dash-flow {
+    to { stroke-dashoffset: -14; }
+  }
+
+  /* Node circles */
+  .node-group { cursor: pointer; }
+  .node-circle {
+    fill: var(--node-default);
+    stroke: var(--node-border);
+    stroke-width: 2.5;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    r: 16;
+  }
+  .node-circle:hover { stroke: var(--accent); r: 18; fill: #f0f9ff; }
+
+  /* Light Theme Node States */
+  .node-circle.start-node { fill: #dcfce7; stroke: var(--accent3); stroke-width: 3.5; }
+  .node-circle.goal-node { fill: #fee2e2; stroke: var(--accent2); stroke-width: 3.5; }
+  .node-circle.frontier { fill: #eff6ff; stroke: var(--accent); stroke-width: 3; animation: pulse-node 0.6s ease-in-out infinite alternate; }
+  .node-circle.exploring { fill: #bfdbfe; stroke: var(--accent); stroke-width: 3; animation: pulse-node 0.4s ease-in-out infinite alternate; }
+  .node-circle.visited { fill: #f1f5f9; stroke: var(--node-border); stroke-width: 2.5; }
+  .node-circle.on-path { fill: #dcfce7; stroke: var(--accent3); stroke-width: 3.5; }
+  .node-circle.goal-reached { fill: #fef3c7; stroke: var(--accent4); stroke-width: 4; animation: celebrate 0.5s ease-in-out infinite alternate; }
+  .node-circle.dfs-stack { fill: #ede9fe; stroke: #8b5cf6; stroke-width: 3; animation: pulse-node 0.5s ease-in-out infinite alternate; }
+  .node-circle.ucs-expanded { fill: #dcfce7; stroke: var(--accent3); stroke-width: 2.5; }
+  .node-circle.astar-open { fill: #fef3c7; stroke: var(--accent4); stroke-width: 3; animation: pulse-node 0.5s ease-in-out infinite alternate; }
+
+  @keyframes pulse-node { from { r: 16; } to { r: 19; } }
+  @keyframes celebrate { from { r: 17; } to { r: 21; } }
+
+  .node-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    fill: var(--text);
+    text-anchor: middle;
+    dominant-baseline: central;
+    pointer-events: none;
+    font-weight: 700;
+  }
+
+  .node-cost-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    fill: var(--text-dim);
+    text-anchor: middle;
+    dominant-baseline: central;
+    pointer-events: none;
+  }
+
+  .edge-cost-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    fill: var(--text-dim);
+    text-anchor: middle;
+    dominant-baseline: central;
+    background: white;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: absolute;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text);
+    font-weight: 500;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 50;
+    white-space: nowrap;
+  }
+
+  .tooltip.show { opacity: 1; }
+
+  /* DFS path cards */
+  .dfs-paths-list {
+    margin-top: 10px;
+    max-height: 100px;
+    overflow-y: auto;
+  }
+  .dfs-path-item {
+    font-size: 0.75rem;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    border-radius: 4px;
+    background: var(--surface2);
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .dfs-path-item:hover { background: #f1f5f9; color: var(--text); }
+  .dfs-path-item.selected { background: #ede9fe; color: #6d28d9; font-weight: 600; border-left: 3px solid #8b5cf6; }
+
+  /* Legend */
+  .legend {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(4px);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+  }
+
+  .legend-title { color: var(--text); font-weight: 700; margin-bottom: 10px; font-size: 0.7rem; text-transform: uppercase; }
+  .legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--text-dim); font-weight: 500;}
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    SURVEILLANCE.NAV
+    <span>APT3010A · INTRODUCTION TO AI</span>
+  </div>
+  <div class="status-bar">
+    <span class="live">SYSTEM ONLINE</span>
+    <span>NODES: 12</span>
+    <span>EDGES: 18</span>
+  </div>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+
+    <div class="sidebar-section">
+      <h3>▸ Select Nodes</h3>
+      <div class="node-inputs">
+        <div class="node-select-group">
+          <label>START NODE</label>
+          <select id="startSelect">
+            <option value="0">Node 0</option>
+            <option value="1">Node 1</option>
+            <option value="2">Node 2</option>
+            <option value="3">Node 3</option>
+            <option value="4">Node 4</option>
+            <option value="5">Node 5</option>
+            <option value="6">Node 6</option>
+            <option value="7">Node 7</option>
+            <option value="8">Node 8</option>
+            <option value="9">Node 9</option>
+            <option value="10">Node 10</option>
+            <option value="11">Node 11</option>
+          </select>
+        </div>
+        <div class="node-select-group">
+          <label>GOAL NODE</label>
+          <select id="goalSelect">
+            <option value="0">Node 0</option>
+            <option value="1">Node 1</option>
+            <option value="2">Node 2</option>
+            <option value="3">Node 3</option>
+            <option value="4" selected>Node 4</option>
+            <option value="5">Node 5</option>
+            <option value="6">Node 6</option>
+            <option value="7">Node 7</option>
+            <option value="8">Node 8</option>
+            <option value="9">Node 9</option>
+            <option value="10">Node 10</option>
+            <option value="11">Node 11</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>▸ Algorithm</h3>
+      <div class="algo-grid">
+        <button class="algo-btn active" data-algo="bfs">
+          <span class="algo-tag">TASK I · BFS</span>
+          <span class="algo-name">Breadth-First Search</span>
+          <span class="algo-desc">Fewest stopovers · Queue-based</span>
+        </button>
+        <button class="algo-btn" data-algo="dfs">
+          <span class="algo-tag">TASK II · DFS</span>
+          <span class="algo-name">Depth-First Search</span>
+          <span class="algo-desc">All paths · Stack-based</span>
+        </button>
+        <button class="algo-btn" data-algo="ucs">
+          <span class="algo-tag">TASK III · UCS</span>
+          <span class="algo-name">Uniform Cost Search</span>
+          <span class="algo-desc">Cheapest path · Priority queue</span>
+        </button>
+        <button class="algo-btn" data-algo="astar">
+          <span class="algo-tag">TASK IV · A*</span>
+          <span class="algo-name">A* Search</span>
+          <span class="algo-desc">Smart path · f(n) = g(n) + h(n)</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>▸ Controls</h3>
+      <div class="speed-row" style="margin-bottom:14px">
+        <label>SPEED</label>
+        <input type="range" id="speedRange" min="1" max="5" value="3">
+        <label id="speedLabel">3×</label>
+      </div>
+      <button class="run-btn" id="runBtn">▶ RUN ALGORITHM</button>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>▸ Result</h3>
+      <div class="results-box" id="resultsBox">
+        <div class="r-empty">Select nodes and algorithm, then run.</div>
+      </div>
+      <div class="dfs-paths-list" id="dfsPathsList" style="display:none"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>▸ How it works</h3>
+      <details class="explanation" id="algoExplanation">
+        <summary id="expSummary">BFS — Breadth-First Search</summary>
+        <div class="exp-body" id="expBody">
+          BFS explores nodes <strong>level by level</strong>, using a <strong>FIFO queue</strong>. It visits all neighbours at the current depth before moving deeper. This guarantees the <strong>path with the fewest stops</strong>. Edge costs are ignored — only hop count matters.<br><br>
+          <strong>Queue:</strong> [start] → dequeue → enqueue all unvisited neighbours → repeat.<br><br>
+          ⚡ Best for: Urgent response, minimizing room transitions.
+        </div>
+      </details>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>▸ Step Log</h3>
+      <div class="log-panel" id="logPanel">
+        <div class="log-line">Awaiting algorithm run...</div>
+      </div>
+    </div>
+
+  </aside>
+
+  <main class="map-area">
+    <div class="map-container">
+      <svg id="map-svg" viewBox="0 0 700 560" xmlns="http://www.w3.org/2000/svg">
+        
+        <rect x="20" y="20" width="660" height="520" rx="12" fill="#f8fafc" stroke="var(--wall-stroke)" stroke-width="2.5"/>
+
+        <rect x="20" y="20" width="300" height="160" rx="8" fill="var(--room-fill)" stroke="var(--wall-stroke)" stroke-width="2"/>
+        <rect x="220" y="20" width="220" height="160" fill="var(--room-fill)" stroke="var(--wall-stroke)" stroke-width="2"/>
+        <rect x="430" y="20" width="250" height="160" rx="8" fill="var(--room-fill)" stroke="var(--wall-stroke)" stroke-width="2"/>
+
+        <rect x="20" y="360" width="230" height="180" rx="8" fill="var(--room-fill)" stroke="var(--wall-stroke)" stroke-width="2"/>
+        <rect x="248" y="360" width="220" height="180" fill="var(--room-fill)" stroke="var(--wall-stroke)" stroke-width="2"/>
+        <rect x="466" y="360" width="214" height="180" rx="8" fill="var(--room-fill)" stroke="var(--wall-stroke)" stroke-width="2"/>
+
+        <rect x="120" y="178" width="60" height="4" fill="var(--room-fill)"/>
+        <rect x="300" y="178" width="60" height="4" fill="var(--room-fill)"/>
+        <rect x="520" y="178" width="60" height="4" fill="var(--room-fill)"/>
+
+        <rect x="80" y="348" width="50" height="4" fill="var(--room-fill)"/>
+        <rect x="320" y="348" width="50" height="4" fill="var(--room-fill)"/>
+        <rect x="550" y="348" width="50" height="4" fill="var(--room-fill)"/>
+
+        <text x="110" y="100" class="room-label">A</text>
+        <text x="320" y="100" class="room-label">B</text>
+        <text x="560" y="100" class="room-label">C</text>
+        <text x="90" y="450" class="room-label">D</text>
+        <text x="340" y="450" class="room-label">E</text>
+        <text x="560" y="450" class="room-label" style="font-size:12px">F</text>
+
+        <text x="340" y="270" class="room-label" style="font-size:18px; fill:#94a3b8;">L</text>
+
+        <polygon points="155,60 175,60 165,80" fill="#cbd5e1"/>
+        <polygon points="370,60 390,60 380,80" fill="#cbd5e1"/>
+        <polygon points="570,60 590,60 580,80" fill="#cbd5e1"/>
+        <polygon points="605,60 625,60 615,80" fill="#cbd5e1"/>
+
+        <g id="edges-layer"></g>
+
+        <g id="edge-costs-layer"></g>
+
+        <g id="nodes-layer"></g>
+
+      </svg>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-title">Map Legend</div>
+      <div class="legend-row"><div class="legend-dot" style="border-color:var(--accent3);background:#dcfce7"></div> Start Node</div>
+      <div class="legend-row"><div class="legend-dot" style="border-color:var(--accent2);background:#fee2e2"></div> Goal Node</div>
+      <div class="legend-row"><div class="legend-dot" style="border-color:var(--accent);background:#eff6ff"></div> Frontier / Queue</div>
+      <div class="legend-row"><div class="legend-dot" style="border-color:var(--node-border);background:#f1f5f9"></div> Visited</div>
+      <div class="legend-row"><div class="legend-dot" style="border-color:var(--accent3);background:#dcfce7; border-width: 3px;"></div> Final Path</div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+// GRAPH DATA — matches the map image exactly
+// ════════════════════════════════════════════════════════
+const NODE_VALUES = {0:0,1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,11:11};
+
+// Node positions on the SVG (matching the map layout precisely)
+const NODE_POS = {
+  7:  {x: 110, y: 165},   // Top-left (Room A corridor)
+  8:  {x: 300, y: 165},   // Top-middle (Room B corridor)
+  9:  {x: 530, y: 165},   // Top-right (Room C corridor)
+  0:  {x: 110, y: 240},   // Middle-left
+  1:  {x: 300, y: 240},   // Middle-center
+  2:  {x: 530, y: 240},   // Middle-right
+  3:  {x: 650, y: 240},   // Far-right
+  6:  {x: 110, y: 310},   // Left (below 0)
+  5:  {x: 390, y: 310},   // Center (corridor L)
+  4:  {x: 650, y: 310},   // Far-right bottom
+  11: {x: 110, y: 385},   // Bottom-left
+  10: {x: 390, y: 385},   // Bottom-center
+};
+
+// Edges matching the map image
+const EDGES = [
+  [7, 8],   // top row
+  [8, 9],   // top row
+  [0, 1],   // middle row
+  [1, 2],   // middle row
+  [2, 3],   // middle row
+  [6, 0],   // left column
+  [7, 0],   // vertical 7→0
+  [8, 1],   // vertical 8→1
+  [9, 2],   // vertical 9→2
+  [3, 4],   // right side
+  [0, 5],   // middle area
+  [5, 4],   // middle to right
+  [5, 10],  // middle down
+  [6, 11],  // left down
+  [11, 10], // bottom row
+  [10, 4],  // bottom right
+  [1, 5],   // centre connections
+  [2, 9],   // upper right area
+];
+
+function buildGraph() {
+  const g = {};
+  for (let i = 0; i < 12; i++) g[i] = [];
+  for (const [a, b] of EDGES) {
+    const cost = Math.abs(NODE_VALUES[a] - NODE_VALUES[b]);
+    g[a].push([b, cost]);
+    g[b].push([a, cost]);
+  }
+  return g;
+}
+
+const GRAPH = buildGraph();
+
+// ════════════════════════════════════════════════════════
+// SVG RENDERING
+// ════════════════════════════════════════════════════════
+const svgNS = "http://www.w3.org/2000/svg";
+const edgesLayer = document.getElementById('edges-layer');
+const edgeCostsLayer = document.getElementById('edge-costs-layer');
+const nodesLayer = document.getElementById('nodes-layer');
+
+const edgeEls = {};   // key: "a-b" → <line>
+const nodeEls = {};   // key: node → {circle, label}
+
+function edgeKey(a, b) { return a < b ? `${a}-${b}` : `${b}-${a}`; }
+
+function drawEdges() {
+  for (const [a, b] of EDGES) {
+    const pa = NODE_POS[a], pb = NODE_POS[b];
+    const line = document.createElementNS(svgNS, 'line');
+    line.setAttribute('x1', pa.x); line.setAttribute('y1', pa.y);
+    line.setAttribute('x2', pb.x); line.setAttribute('y2', pb.y);
+    line.setAttribute('class', 'edge');
+    edgesLayer.appendChild(line);
+    edgeEls[edgeKey(a, b)] = line;
+
+    // Cost label
+    const cost = Math.abs(NODE_VALUES[a] - NODE_VALUES[b]);
+    const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2;
+    
+    // Add white background rect for text readability
+    const bgRect = document.createElementNS(svgNS, 'rect');
+    bgRect.setAttribute('x', mx - 6); bgRect.setAttribute('y', my - 12);
+    bgRect.setAttribute('width', 12); bgRect.setAttribute('height', 12);
+    bgRect.setAttribute('fill', '#ffffff');
+    bgRect.setAttribute('rx', 2);
+    edgeCostsLayer.appendChild(bgRect);
+
+    const lbl = document.createElementNS(svgNS, 'text');
+    lbl.setAttribute('x', mx); lbl.setAttribute('y', my - 6);
+    lbl.setAttribute('class', 'edge-cost-label');
+    lbl.textContent = cost;
+    edgeCostsLayer.appendChild(lbl);
+  }
+}
+
+function drawNodes() {
+  for (const id of Object.keys(NODE_POS).map(Number)) {
+    const {x, y} = NODE_POS[id];
+    const g = document.createElementNS(svgNS, 'g');
+    g.setAttribute('class', 'node-group');
+
+    const circle = document.createElementNS(svgNS, 'circle');
+    circle.setAttribute('cx', x); circle.setAttribute('cy', y);
+    circle.setAttribute('r', 16);
+    circle.setAttribute('class', 'node-circle');
+
+    const lbl = document.createElementNS(svgNS, 'text');
+    lbl.setAttribute('x', x); lbl.setAttribute('y', y);
+    lbl.setAttribute('class', 'node-label');
+    lbl.textContent = id;
+
+    g.appendChild(circle);
+    g.appendChild(lbl);
+    nodesLayer.appendChild(g);
+
+    nodeEls[id] = {circle, label: lbl, group: g};
+
+    // Tooltip on hover
+    g.addEventListener('mouseenter', (e) => showTooltip(id, e));
+    g.addEventListener('mouseleave', hideTooltip);
+    g.addEventListener('click', () => handleNodeClick(id));
+  }
+}
+
+drawEdges();
+drawNodes();
+
+// ════════════════════════════════════════════════════════
+// STATE RESET
+// ════════════════════════════════════════════════════════
+function resetVisuals() {
+  for (const key in edgeEls) {
+    edgeEls[key].setAttribute('class', 'edge');
+    edgeEls[key].style.strokeDasharray = '';
+    edgeEls[key].style.animation = '';
+  }
+  for (const id in nodeEls) {
+    const el = nodeEls[id];
+    el.circle.setAttribute('class', 'node-circle');
+    el.circle.setAttribute('r', 16);
+  }
+}
+
+function applyStartGoal(start, goal) {
+  nodeEls[start].circle.setAttribute('class', 'node-circle start-node');
+  nodeEls[goal].circle.setAttribute('class', 'node-circle goal-node');
+}
+
+// ════════════════════════════════════════════════════════
+// TOOLTIP
+// ════════════════════════════════════════════════════════
+const tooltip = document.getElementById('tooltip');
+function showTooltip(id, e) {
+  const rect = document.querySelector('.map-container').getBoundingClientRect();
+  const p = NODE_POS[id];
+  tooltip.innerHTML = `Node <strong>${id}</strong> &middot; Value: ${NODE_VALUES[id]} &middot; Neighbours: ${GRAPH[id].map(([n,c])=>`${n}(cost:${c})`).join(', ')}`;
+  tooltip.style.left = (p.x / 700 * rect.width + rect.left - rect.left + 20) + 'px';
+  tooltip.style.top = (p.y / 560 * rect.height + rect.top - rect.top - 40) + 'px';
+  tooltip.classList.add('show');
+}
+function hideTooltip() { tooltip.classList.remove('show'); }
+
+let clickMode = null; // 'start' or 'goal'
+function handleNodeClick(id) {
+  const startSel = document.getElementById('startSelect');
+  const goalSel = document.getElementById('goalSelect');
+  // Just update goal on click for quick testing
+  goalSel.value = id;
+  updateStartGoalHighlight();
+}
+
+// ════════════════════════════════════════════════════════
+// LOG PANEL
+// ════════════════════════════════════════════════════════
+const logPanel = document.getElementById('logPanel');
+function clearLog() { logPanel.innerHTML = ''; }
+function log(msg, cls = '') {
+  const d = document.createElement('div');
+  d.className = 'log-line ' + cls;
+  d.textContent = msg;
+  logPanel.appendChild(d);
+  logPanel.scrollTop = logPanel.scrollHeight;
+}
+
+// ════════════════════════════════════════════════════════
+// RESULTS
+// ════════════════════════════════════════════════════════
+function showResults(html) {
+  document.getElementById('resultsBox').innerHTML = html;
+}
+
+function calcPathCost(path) {
+  let total = 0;
+  for (let i = 0; i < path.length - 1; i++) {
+    const a = path[i], b = path[i+1];
+    for (const [n, c] of GRAPH[a]) { if (n === b) { total += c; break; } }
+  }
+  return total;
+}
+
+// ════════════════════════════════════════════════════════
+// ANIMATION HELPERS
+// ════════════════════════════════════════════════════════
+let animRunning = false;
+let animQueue = [];
+let speedMultiplier = 3;
+
+const BASE_DELAY = 800; // ms at 1x speed
+
+function delay(ms) {
+  return new Promise(res => setTimeout(res, ms / speedMultiplier));
+}
+
+async function animateEdge(a, b, cls, extra = '') {
+  const key = edgeKey(a, b);
+  if (!edgeEls[key]) return;
+  edgeEls[key].setAttribute('class', `edge ${cls}`);
+}
+
+async function animateNode(id, cls) {
+  if (!nodeEls[id]) return;
+  nodeEls[id].circle.setAttribute('class', `node-circle ${cls}`);
+}
+
+// ════════════════════════════════════════════════════════
+// BFS ANIMATION
+// ════════════════════════════════════════════════════════
+async function runBFS(start, goal) {
+  clearLog();
+  log(`BFS: Start=${start}  Goal=${goal}`, 'highlight');
+  log(`Using FIFO queue. Exploring level by level...`);
+
+  const queue = [[start, [start]]];
+  const visited = new Set([start]);
+  animateNode(start, 'start-node');
+  animateNode(goal, 'goal-node');
+
+  let step = 0;
+  while (queue.length > 0) {
+    if (!animRunning) return;
+    const [current, path] = queue.shift();
+    step++;
+
+    if (current !== start && current !== goal) {
+      await animateNode(current, 'exploring');
+      await delay(BASE_DELAY * 0.4);
+    }
+    log(`Step ${step}: Visiting node ${current} | Path so far: ${path.join('→')}`);
+
+    if (current === goal) {
+      log(`✓ GOAL REACHED! Path: ${path.join('→')} | Stops: ${path.length-2}`, 'path');
+      // Flash final path
+      for (let i = 0; i < path.length - 1; i++) {
+        await animateEdge(path[i], path[i+1], 'path-edge');
+        await delay(250);
+      }
+      for (const n of path) {
+        if (n === goal) await animateNode(n, 'goal-reached');
+        else await animateNode(n, 'on-path');
+      }
+      const cost = calcPathCost(path);
+      showResults(`
+        <div class="r-line"><span class="r-label">ALGORITHM: </span><span class="r-value">BFS</span></div>
+        <div class="r-line"><span class="r-label">PATH: </span><span class="r-path">${path.join(' → ')}</span></div>
+        <div class="r-line"><span class="r-label">STOPS: </span><span class="r-value">${path.length-2} intermediate</span></div>
+        <div class="r-line"><span class="r-label">ENERGY COST: </span><span class="r-cost">${cost}</span></div>
+        <div class="r-line"><span class="r-label">NODES VISITED: </span><span class="r-value">${step}</span></div>
+      `);
+      return;
+    }
+
+    const neighbours = GRAPH[current];
+    for (const [nb, cost] of neighbours) {
+      if (!visited.has(nb)) {
+        visited.add(nb);
+        if (nb !== goal) await animateNode(nb, 'frontier');
+        await animateEdge(current, nb, 'explored traversing');
+        await delay(BASE_DELAY * 0.5);
+        edgeEls[edgeKey(current, nb)].setAttribute('class', 'edge explored');
+        log(`  → Enqueue node ${nb} (edge cost: ${cost})`, '');
+        queue.push([nb, path.concat(nb)]);
+      }
+    }
+    await delay(BASE_DELAY * 0.3);
+  }
+  log('No path found.', 'warn');
+  showResults('<div class="r-empty">No path found.</div>');
+}
+
+// ════════════════════════════════════════════════════════
+// DFS ANIMATION (shows multiple paths)
+// ════════════════════════════════════════════════════════
+async function runDFS(start, goal) {
+  clearLog();
+  log(`DFS: Start=${start}  Goal=${goal}`, 'highlight');
+  log(`Using LIFO stack. Diving deep, finding ALL paths...`);
+
+  const allPaths = [];
+  const stack = [[start, [start], new Set([start])]];
+  animateNode(start, 'start-node');
+  animateNode(goal, 'goal-node');
+
+  let step = 0;
+  while (stack.length > 0) {
+    if (!animRunning) return;
+    const [current, path, visitedInPath] = stack.pop();
+    step++;
+
+    if (current !== start && current !== goal) {
+      await animateNode(current, 'dfs-stack');
+    }
+    log(`Step ${step}: Pop node ${current} | Depth: ${path.length-1}`);
+
+    if (current === goal) {
+      allPaths.push([...path]);
+      log(`✓ PATH FOUND: ${path.join('→')} | Cost: ${calcPathCost(path)}`, 'path');
+      // Briefly flash this path
+      for (let i = 0; i < path.length - 1; i++) {
+        const key = edgeKey(path[i], path[i+1]);
+        edgeEls[key] && edgeEls[key].setAttribute('class', 'edge dfs-explored');
+      }
+      await delay(BASE_DELAY * 0.4);
+      continue;
+    }
+
+    const neighbours = GRAPH[current];
+    for (const [nb, cost] of neighbours) {
+      if (!visitedInPath.has(nb)) {
+        const newVisited = new Set(visitedInPath);
+        newVisited.add(nb);
+        await animateEdge(current, nb, 'dfs-explored traversing');
+        await delay(BASE_DELAY * 0.25);
+        edgeEls[edgeKey(current, nb)] && edgeEls[edgeKey(current, nb)].setAttribute('class', 'edge dfs-explored');
+        stack.push([nb, path.concat(nb), newVisited]);
+      }
+    }
+    await delay(BASE_DELAY * 0.2);
+  }
+
+  // Sort by length, show cheapest highlighted
+  allPaths.sort((a, b) => a.length - b.length || calcPathCost(a) - calcPathCost(b));
+
+  // Show all paths in sidebar
+  const dfsList = document.getElementById('dfsPathsList');
+  dfsList.style.display = 'block';
+  dfsList.innerHTML = '';
+  allPaths.forEach((p, i) => {
+    const cost = calcPathCost(p);
+    const div = document.createElement('div');
+    div.className = 'dfs-path-item' + (i === 0 ? ' selected' : '');
+    div.textContent = `P${i+1}: ${p.join('→')} [cost:${cost}, stops:${p.length-2}]`;
+    div.addEventListener('click', () => {
+      document.querySelectorAll('.dfs-path-item').forEach(x => x.classList.remove('selected'));
+      div.classList.add('selected');
+      highlightDFSPath(p);
+    });
+    dfsList.appendChild(div);
+  });
+
+  // Highlight best path
+  if (allPaths.length > 0) highlightDFSPath(allPaths[0]);
+
+  log(`DFS complete. Found ${allPaths.length} paths.`, 'highlight');
+  showResults(`
+    <div class="r-line"><span class="r-label">ALGORITHM: </span><span class="r-value">DFS</span></div>
+    <div class="r-line"><span class="r-label">TOTAL PATHS: </span><span class="r-value">${allPaths.length}</span></div>
+    <div class="r-line"><span class="r-label">SHORTEST: </span><span class="r-path">${allPaths[0]?.join(' → ')}</span></div>
+    <div class="r-line"><span class="r-label">CHEAPEST: </span><span class="r-cost">${Math.min(...allPaths.map(calcPathCost))} energy</span></div>
+  `);
+}
+
+function highlightDFSPath(path) {
+  // Reset edge styles
+  for (const key in edgeEls) edgeEls[key].setAttribute('class', 'edge dfs-explored');
+  // Highlight selected path
+  for (let i = 0; i < path.length - 1; i++) {
+    const key = edgeKey(path[i], path[i+1]);
+    edgeEls[key] && edgeEls[key].setAttribute('class', 'edge path-edge');
+  }
+  for (const n of path) nodeEls[n]?.circle.setAttribute('class', 'node-circle on-path');
+  const start = path[0], goal = path[path.length-1];
+  nodeEls[start]?.circle.setAttribute('class', 'node-circle start-node');
+  nodeEls[goal]?.circle.setAttribute('class', 'node-circle goal-reached');
+}
+
+// ════════════════════════════════════════════════════════
+// UCS ANIMATION
+// ════════════════════════════════════════════════════════
+async function runUCS(start, goal) {
+  clearLog();
+  log(`UCS: Start=${start}  Goal=${goal}`, 'highlight');
+  log(`Priority queue ordered by cumulative cost g(n).`);
+
+  // Min-heap: [cost, node, path]
+  const pq = [[0, start, [start]]];
+  const bestCost = {[start]: 0};
+  animateNode(start, 'start-node');
+  animateNode(goal, 'goal-node');
+
+  let step = 0;
+  while (pq.length > 0) {
+    if (!animRunning) return;
+
+    // Pop minimum cost
+    pq.sort((a, b) => a[0] - b[0]);
+    const [cost, current, path] = pq.shift();
+    step++;
+
+    if (current !== start && current !== goal) {
+      await animateNode(current, 'ucs-expanded');
+    }
+    log(`Step ${step}: Expand node ${current} | g(n)=${cost} | Path: ${path.join('→')}`);
+
+    if (current === goal) {
+      log(`✓ OPTIMAL FOUND: ${path.join('→')} | Cost: ${cost}`, 'path');
+      for (let i = 0; i < path.length - 1; i++) {
+        await animateEdge(path[i], path[i+1], 'path-edge');
+        await delay(280);
+      }
+      for (const n of path) {
+        if (n === goal) await animateNode(n, 'goal-reached');
+        else await animateNode(n, 'on-path');
+      }
+      showResults(`
+        <div class="r-line"><span class="r-label">ALGORITHM: </span><span class="r-value">UCS</span></div>
+        <div class="r-line"><span class="r-label">PATH: </span><span class="r-path">${path.join(' → ')}</span></div>
+        <div class="r-line"><span class="r-label">STOPS: </span><span class="r-value">${path.length-2} intermediate</span></div>
+        <div class="r-line"><span class="r-label">ENERGY COST: </span><span class="r-cost">${cost} (OPTIMAL)</span></div>
+        <div class="r-line"><span class="r-label">EXPANSIONS: </span><span class="r-value">${step}</span></div>
+      `);
+      return;
+    }
+
+    for (const [nb, edgeCost] of GRAPH[current]) {
+      const newCost = cost + edgeCost;
+      if (bestCost[nb] === undefined || newCost < bestCost[nb]) {
+        bestCost[nb] = newCost;
+        if (nb !== goal) await animateNode(nb, 'frontier');
+        await animateEdge(current, nb, 'ucs-active traversing');
+        await delay(BASE_DELAY * 0.45);
+        edgeEls[edgeKey(current, nb)]?.setAttribute('class', 'edge explored');
+        log(`  → Node ${nb}: g(n)=${newCost} (edge cost ${edgeCost})`, '');
+        pq.push([newCost, nb, path.concat(nb)]);
+      }
+    }
+    await delay(BASE_DELAY * 0.3);
+  }
+  log('No path found.', 'warn');
+  showResults('<div class="r-empty">No path found.</div>');
+}
+
+// ════════════════════════════════════════════════════════
+// A* ANIMATION
+// ════════════════════════════════════════════════════════
+function heuristic(node, goal) { return Math.abs(NODE_VALUES[node] - NODE_VALUES[goal]); }
+
+async function runAStar(start, goal) {
+  clearLog();
+  log(`A*: Start=${start}  Goal=${goal}`, 'highlight');
+  log(`f(n) = g(n) + h(n)  |  h(n) = |val(n) - val(goal)|`);
+  log(`Heuristic for goal ${goal}: h(n) = |val - ${NODE_VALUES[goal]}|`);
+
+  const h0 = heuristic(start, goal);
+  const pq = [[h0, 0, start, [start]]]; // [f, g, node, path]
+  const bestG = {[start]: 0};
+  animateNode(start, 'start-node');
+  animateNode(goal, 'goal-node');
+
+  let step = 0;
+  while (pq.length > 0) {
+    if (!animRunning) return;
+
+    pq.sort((a, b) => a[0] - b[0]);
+    const [f, g, current, path] = pq.shift();
+    step++;
+
+    if (current !== start && current !== goal) {
+      await animateNode(current, 'astar-open');
+    }
+    const h = heuristic(current, goal);
+    log(`Step ${step}: Node ${current} | g=${g} h=${h} f=${f} | Path: ${path.join('→')}`);
+
+    if (g > (bestG[current] ?? Infinity)) { continue; }
+
+    if (current === goal) {
+      log(`✓ OPTIMAL: ${path.join('→')} | Cost: ${g}`, 'path');
+      for (let i = 0; i < path.length - 1; i++) {
+        await animateEdge(path[i], path[i+1], 'path-edge');
+        await delay(280);
+      }
+      for (const n of path) {
+        if (n === goal) await animateNode(n, 'goal-reached');
+        else await animateNode(n, 'on-path');
+      }
+      // Show heuristic breakdown
+      let hBreakdown = path.map(n => `${n}:h=${heuristic(n,goal)}`).join('  ');
+      showResults(`
+        <div class="r-line"><span class="r-label">ALGORITHM: </span><span class="r-value">A* SEARCH</span></div>
+        <div class="r-line"><span class="r-label">PATH: </span><span class="r-path">${path.join(' → ')}</span></div>
+        <div class="r-line"><span class="r-label">STOPS: </span><span class="r-value">${path.length-2} intermediate</span></div>
+        <div class="r-line"><span class="r-label">ENERGY COST: </span><span class="r-cost">${g} (OPTIMAL)</span></div>
+        <div class="r-line"><span class="r-label">EXPANSIONS: </span><span class="r-value">${step}</span></div>
+        <div class="r-line"><span class="r-label">h VALUES: </span><span class="r-value" style="font-size:0.75rem">${hBreakdown}</span></div>
+      `);
+      return;
+    }
+
+    for (const [nb, edgeCost] of GRAPH[current]) {
+      const newG = g + edgeCost;
+      if (newG < (bestG[nb] ?? Infinity)) {
+        bestG[nb] = newG;
+        const newH = heuristic(nb, goal);
+        const newF = newG + newH;
+        if (nb !== goal) await animateNode(nb, 'astar-open');
+        await animateEdge(current, nb, 'astar-active traversing');
+        await delay(BASE_DELAY * 0.45);
+        edgeEls[edgeKey(current, nb)]?.setAttribute('class', 'edge explored');
+        log(`  → Node ${nb}: g=${newG} + h=${newH} = f=${newF}`, '');
+        pq.push([newF, newG, nb, path.concat(nb)]);
+      }
+    }
+    await delay(BASE_DELAY * 0.3);
+  }
+  log('No path found.', 'warn');
+  showResults('<div class="r-empty">No path found.</div>');
+}
+
+// ════════════════════════════════════════════════════════
+// UI CONTROLS
+// ════════════════════════════════════════════════════════
+let selectedAlgo = 'bfs';
+
+document.querySelectorAll('.algo-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.algo-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedAlgo = btn.dataset.algo;
+    updateExplanation(selectedAlgo);
+  });
+});
+
+const explanations = {
+  bfs: {
+    title: 'BFS — Breadth-First Search',
+    body: `BFS explores nodes <strong>level by level</strong>, using a <strong>FIFO queue</strong>. It visits all neighbours at the current depth before moving deeper. This guarantees the <strong>path with the fewest stops</strong>. Edge costs are ignored — only hop count matters.<br><br><strong>Queue:</strong> [start] → dequeue → enqueue all unvisited neighbours → repeat.<br><br>⚡ Best for: Urgent response, minimizing room transitions.`
+  },
+  dfs: {
+    title: 'DFS — Depth-First Search',
+    body: `DFS uses a <strong>LIFO stack</strong> to dive deep down one path before backtracking. Unlike BFS, it explores <strong>ALL possible paths</strong> from start to goal. Useful for comprehensive exploration and path analysis.<br><br><strong>Stack:</strong> push start → pop → push all unvisited neighbours → repeat until all paths found.<br><br>🔍 Best for: Full path analysis, understanding all route options.`
+  },
+  ucs: {
+    title: 'UCS — Uniform Cost Search',
+    body: `UCS always expands the node with the <strong>lowest cumulative cost g(n)</strong> using a <strong>min-priority queue</strong>. It guarantees the <strong>optimal (cheapest) path</strong> by never expanding an already-optimal node with a higher-cost route.<br><br><strong>f(n) = g(n)</strong> (actual cost so far only)<br><br>🔋 Best for: Energy efficiency, minimizing total traversal cost.`
+  },
+  astar: {
+    title: 'A* — A-Star Search',
+    body: `A* combines UCS and heuristic guidance. It expands by <strong>f(n) = g(n) + h(n)</strong>, where g is actual cost and h is an estimated remaining cost.<br><br><strong>Heuristic: h(n) = |value(node) − value(goal)|</strong><br><br>This guides the search towards the goal, reducing unnecessary expansions compared to UCS while still guaranteeing optimality if h is admissible.<br><br>🧠 Best for: Smart, fast optimal pathfinding.`
+  }
+};
+
+function updateExplanation(algo) {
+  const exp = explanations[algo];
+  document.getElementById('expSummary').textContent = exp.title;
+  document.getElementById('expBody').innerHTML = exp.body;
+}
+
+document.getElementById('speedRange').addEventListener('input', (e) => {
+  speedMultiplier = parseInt(e.target.value);
+  document.getElementById('speedLabel').textContent = speedMultiplier + '×';
+});
+
+function updateStartGoalHighlight() {
+  const start = parseInt(document.getElementById('startSelect').value);
+  const goal = parseInt(document.getElementById('goalSelect').value);
+  resetVisuals();
+  applyStartGoal(start, goal);
+}
+
+document.getElementById('startSelect').addEventListener('change', updateStartGoalHighlight);
+document.getElementById('goalSelect').addEventListener('change', updateStartGoalHighlight);
+
+const runBtn = document.getElementById('runBtn');
+
+runBtn.addEventListener('click', async () => {
+  if (animRunning) {
+    animRunning = false;
+    runBtn.textContent = '▶ RUN ALGORITHM';
+    runBtn.classList.remove('stopping');
+    return;
+  }
+
+  const start = parseInt(document.getElementById('startSelect').value);
+  const goal = parseInt(document.getElementById('goalSelect').value);
+
+  if (start === goal) {
+    showResults('<div class="r-empty">Start and goal cannot be the same.</div>');
+    return;
+  }
+
+  document.getElementById('dfsPathsList').style.display = 'none';
+  document.getElementById('dfsPathsList').innerHTML = '';
+  resetVisuals();
+  applyStartGoal(start, goal);
+
+  animRunning = true;
+  runBtn.textContent = '■ STOPPING...';
+  runBtn.classList.add('stopping');
+
+  try {
+    if (selectedAlgo === 'bfs') await runBFS(start, goal);
+    else if (selectedAlgo === 'dfs') await runDFS(start, goal);
+    else if (selectedAlgo === 'ucs') await runUCS(start, goal);
+    else if (selectedAlgo === 'astar') await runAStar(start, goal);
+  } finally {
+    animRunning = false;
+    runBtn.textContent = '▶ RUN ALGORITHM';
+    runBtn.classList.remove('stopping');
+  }
+});
+
+// Initial setup
+updateStartGoalHighlight();
+updateExplanation('bfs');
+</script>
+</body>
+</html>
